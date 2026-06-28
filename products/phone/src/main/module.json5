@@ -1,0 +1,42 @@
+{
+  "module": {
+    "name": "phone",
+    "type": "feature",
+    "description": "$string:module_desc",
+    "mainElement": "PhoneAbility",
+    "deviceTypes": [
+      "phone",
+      "tablet"
+    ],
+    "deliveryWithInstall": true,
+    "installationFree": false,
+    "requestPermissions": [
+      {
+        "name": "ohos.permission.INTERNET"
+      }
+    ],
+    "pages": "$profile:main_pages",
+    "abilities": [
+      {
+        "name": "PhoneAbility",
+        "srcEntry": "./ets/entryability/PhoneAbility.ets",
+        "description": "$string:PhoneAbility_desc",
+        "icon": "$media:layered_image",
+        "label": "$string:PhoneAbility_label",
+        "exported": true,
+        "startWindowIcon": "$media:layered_image",
+        "startWindowBackground": "$color:start_bg",
+        "skills": [
+          {
+            "actions": [
+              "action.system.home"
+            ],
+            "entities": [
+              "entity.system.home"
+            ]
+          }
+        ]
+      }
+    ]
+  }
+}

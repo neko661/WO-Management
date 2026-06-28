@@ -1,0 +1,1 @@
+{"name":"my","version":"1.0.0","description":"","main":"index.ets","author":"","license":"","dependencies":{"utils":"file:../../commons/utils","datastore":"file:../../commons/datastore","uicomponents":"file:../../commons/uicomponents"}}
