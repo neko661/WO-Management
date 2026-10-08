@@ -6,6 +6,7 @@ export struct OperatorProcessTaskView {
   @Param cardPadding: number = 20;
   @Event onBack?: () => void;
   @Event onViewDetail?: (orderId: number) => void;
+  @Event onEnterLine?: (lineId: number) => void;
   private navStack: NavPathStack | null = null;
 
   aboutToAppear(): void {
@@ -122,6 +123,8 @@ export struct OperatorProcessTaskView {
   @Builder
   buildPendingTab() {
     Column() {
+      this.buildSelectionNotice()
+
       if (this.viewModel.currentTask) {
         this.buildCurrentTaskCard(this.viewModel.currentTask!)
       }
@@ -214,7 +217,7 @@ export struct OperatorProcessTaskView {
 
       Row() {
         Row() {
-          Text('▶ 开工')
+          Text(this.viewModel.isTaskSelected(task.id) ? '已选中' : '选择任务')
             .fontSize('16fp')
             .fontColor('#0F766E')
             .fontWeight(FontWeight.Bold)
@@ -226,13 +229,13 @@ export struct OperatorProcessTaskView {
         .justifyContent(FlexAlign.Center)
         .alignItems(VerticalAlign.Center)
         .onClick(() => {
-          this.viewModel.startTask(task.id);
+          this.viewModel.selectTask(task.id);
         })
 
         Blank().width('12vp')
 
         Row() {
-          Text('报工 →')
+          Text('进入产线 →')
             .fontSize('16fp')
             .fontColor('#FFFFFF')
             .fontWeight(FontWeight.Bold)
@@ -243,10 +246,11 @@ export struct OperatorProcessTaskView {
         .borderRadius('16vp')
         .justifyContent(FlexAlign.Center)
         .alignItems(VerticalAlign.Center)
-        .onClick(async () => {
-          await this.viewModel.reportTask(task.id);
-          if (this.onViewDetail) {
-            this.onViewDetail(task.workOrderId);
+        .opacity(this.viewModel.canEnterLine() ? 1 : 0.65)
+        .onClick(() => {
+          this.viewModel.selectTask(task.id);
+          if (this.onEnterLine) {
+            this.onEnterLine(this.viewModel.getSelectedLineId());
           }
         })
       }
@@ -257,7 +261,7 @@ export struct OperatorProcessTaskView {
     .padding({ left: '18vp', right: '18vp', top: '18vp', bottom: 0 })
     .borderRadius('20vp')
     .backgroundColor('#ECFDF5')
-    .border({ width: '1vp', color: '#A7F3D0' })
+    .border({ width: this.viewModel.isTaskSelected(task.id) ? '2vp' : '1vp', color: this.viewModel.isTaskSelected(task.id) ? '#10B981' : '#A7F3D0' })
     .margin({ bottom: '12vp' })
   }
 
@@ -378,12 +382,62 @@ export struct OperatorProcessTaskView {
       }
       .alignItems(HorizontalAlign.Start)
       .layoutWeight(1)
+
+      Text(this.viewModel.isTaskSelected(task.id) ? '已选' : '选择')
+        .fontSize('11fp')
+        .fontColor(this.viewModel.isTaskSelected(task.id) ? '#FFFFFF' : '#0F766E')
+        .padding({ left: '10vp', right: '10vp', top: '4vp', bottom: '4vp' })
+        .borderRadius('10vp')
+        .backgroundColor(this.viewModel.isTaskSelected(task.id) ? '#10B981' : '#ECFDF5')
     }
     .width('100%')
     .padding('16vp')
     .borderRadius('20vp')
     .backgroundColor('#FFFFFF')
-    .border({ width: '1vp', color: '#E2E8F0' })
+    .border({ width: this.viewModel.isTaskSelected(task.id) ? '2vp' : '1vp', color: this.viewModel.isTaskSelected(task.id) ? '#10B981' : '#E2E8F0' })
     .margin({ bottom: '10vp' })
+    .onClick(() => {
+      this.viewModel.selectTask(task.id);
+    })
+  }
+
+  @Builder
+  buildSelectionNotice() {
+    Column() {
+      Text('先选择任务，再进入产线')
+        .fontSize('16fp')
+        .fontColor('#0F172A')
+        .fontWeight(FontWeight.Bold)
+        .width('100%')
+      Text(this.viewModel.getSelectedTaskSummary())
+        .fontSize('13fp')
+        .fontColor('#64748B')
+        .width('100%')
+        .margin({ top: '6vp' })
+
+      Row() {
+        Button('进入产线')
+          .layoutWeight(1)
+          .height('44vp')
+          .fontColor('#FFFFFF')
+          .backgroundColor('#0D9488')
+          .borderRadius('12vp')
+          .enabled(this.viewModel.canEnterLine())
+          .opacity(this.viewModel.canEnterLine() ? 1 : 0.65)
+          .onClick(() => {
+            if (this.onEnterLine) {
+              this.onEnterLine(this.viewModel.getSelectedLineId());
+            }
+          })
+      }
+      .width('100%')
+      .margin({ top: '12vp' })
+    }
+    .width('100%')
+    .padding('16vp')
+    .borderRadius('18vp')
+    .backgroundColor('#FFFFFF')
+    .border({ width: '1vp', color: '#E2E8F0' })
+    .margin({ bottom: '14vp' })
   }
 }

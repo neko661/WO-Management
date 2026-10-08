@@ -196,6 +196,7 @@ export struct HomeTabsView {
         // 产线详情页
         ProductionLineDetailView({
           lineId: this.currentLineId,
+          role: this.role,
           onBack: () => {
             this.showLineDetail = false;
             this.currentLineId = 0;
@@ -215,6 +216,10 @@ export struct HomeTabsView {
           viewModel: this.processTaskViewModel,
           onBack: () => {
             this.showProcessTask = false;
+          },
+          onEnterLine: (lineId: number) => {
+            this.showProcessTask = false;
+            this.handleLineClick(lineId);
           },
           onViewDetail: (orderId: number) => {
             this.handleOrderClick(orderId);

@@ -15,11 +15,17 @@ export class MyViewModel extends BaseViewModel {
   private session: SessionManager = SessionManager.getInstance();
 
   async init(): Promise<void> {
-    this.profile.employeeNo = await this.session.getEmployeeNo();
-    this.profile.name = await this.session.getUserName();
+    const employeeNo: string = await this.session.getEmployeeNo();
+    const name: string = await this.session.getUserName();
     const role: string = await this.session.getRole();
-    this.profile.role = role;
-    this.profile.currentRole = this.getRoleLabel(role);
+    this.profile = {
+      employeeNo: employeeNo,
+      name: name,
+      role: role,
+      currentRole: this.getRoleLabel(role),
+      status: '在岗',
+      appVersion: this.profile.appVersion
+    };
   }
 
   getRoleLabel(role?: string): string {

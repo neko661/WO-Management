@@ -7,6 +7,11 @@ export interface QualityOverview {
   monthlyDefect: number;
   yearToDatePassRate: number;
   lastMonthPassRate: number;
+  passRateChange: number;
+  monthlyDefectChange: number;
+  passRecordCount: number;
+  conditionalRecordCount: number;
+  failRecordCount: number;
 }
 
 export interface DefectCategory {

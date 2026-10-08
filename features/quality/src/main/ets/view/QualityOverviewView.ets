@@ -186,6 +186,8 @@ export struct QualityOverviewView {
   @Builder
   buildOverviewTab() {
     Column() {
+      this.buildHeroSummary()
+
       // KPI 卡片
       this.buildKpiOverview()
 
@@ -196,6 +198,72 @@ export struct QualityOverviewView {
       this.buildLineQuality()
     }
     .width('100%')
+  }
+
+  @Builder
+  buildHeroSummary() {
+    Column() {
+      Row() {
+        Column() {
+          Text('质量驾驶舱')
+            .fontSize('18fp')
+            .fontColor('#FFFFFF')
+            .fontWeight(FontWeight.Bold)
+          Text(this.getTodayLabel() + ' · ' + (this.viewModel.userName || '质检员'))
+            .fontSize('12fp')
+            .fontColor('#D7E7FF')
+            .margin({ top: '4vp' })
+        }
+        .alignItems(HorizontalAlign.Start)
+        .layoutWeight(1)
+
+        Column() {
+          Text(this.viewModel.overview.passRate.toString() + '%')
+            .fontSize('28fp')
+            .fontColor('#FFFFFF')
+            .fontWeight(FontWeight.Bold)
+          Text('综合合格率')
+            .fontSize('11fp')
+            .fontColor('#D7E7FF')
+            .margin({ top: '4vp' })
+        }
+        .alignItems(HorizontalAlign.End)
+      }
+      .width('100%')
+
+      Row() {
+        this.buildHeroMetric('累计检验', this.viewModel.overview.totalInspected.toString())
+        this.buildHeroMetric('待检工单', this.viewModel.overview.pendingInspect.toString())
+        this.buildHeroMetric('本月不良', this.viewModel.overview.monthlyDefect.toString())
+      }
+      .width('100%')
+      .margin({ top: '16vp' })
+    }
+    .width('100%')
+    .padding('16vp')
+    .borderRadius('18vp')
+    .linearGradient({
+      angle: 135,
+      colors: [['#0F5EFF', 0], ['#1E88E5', 0.55], ['#24C3FF', 1]]
+    })
+    .margin({ left: this.cardPadding, right: this.cardPadding, top: '8vp', bottom: '8vp' })
+    .shadow({ radius: 8, color: '#1F0F5EFF', offsetY: 4 })
+  }
+
+  @Builder
+  buildHeroMetric(label: string, value: string) {
+    Column() {
+      Text(value)
+        .fontSize('18fp')
+        .fontColor('#FFFFFF')
+        .fontWeight(FontWeight.Bold)
+      Text(label)
+        .fontSize('11fp')
+        .fontColor('#D7E7FF')
+        .margin({ top: '4vp' })
+    }
+    .layoutWeight(1)
+    .alignItems(HorizontalAlign.Start)
   }
 
   @Builder
@@ -264,9 +332,13 @@ export struct QualityOverviewView {
       .margin({ bottom: '10vp' })
 
       Column() {
-        ForEach(this.viewModel.defectCategories.slice(0, 5), (cat: DefectCategory) => {
-          this.buildDefectBar(cat)
-        })
+        if (this.viewModel.defectCategories.length === 0) {
+          this.buildEmptyHint('暂无缺陷数据，等待抽检或报工不良汇总')
+        } else {
+          ForEach(this.viewModel.defectCategories.slice(0, 5), (cat: DefectCategory) => {
+            this.buildDefectBar(cat)
+          })
+        }
       }
       .width('100%')
     }
@@ -324,9 +396,13 @@ export struct QualityOverviewView {
         .width('100%')
         .margin({ bottom: '10vp' })
 
-      ForEach(this.viewModel.lineQualityList, (line: LineQuality) => {
-        this.buildLineQualityCard(line)
-      })
+      if (this.viewModel.lineQualityList.length === 0) {
+        this.buildEmptyHint('暂无产线质检汇总，待工单和抽检数据生成')
+      } else {
+        ForEach(this.viewModel.lineQualityList, (line: LineQuality) => {
+          this.buildLineQualityCard(line)
+        })
+      }
     }
     .width('100%')
     .padding({ left: this.cardPadding, right: this.cardPadding, top: '8vp', bottom: '8vp' })
@@ -458,48 +534,52 @@ export struct QualityOverviewView {
         .margin({ bottom: '12vp' })
 
       Column() {
-        ForEach(this.viewModel.defectCategories, (cat: DefectCategory) => {
-          Row() {
-            Row()
-              .width('16vp')
-              .height('16vp')
-              .borderRadius('4vp')
-              .backgroundColor(cat.color)
-              .margin({ right: '12vp' })
+        if (this.viewModel.defectCategories.length === 0) {
+          this.buildEmptyHint('暂无缺陷类别分布')
+        } else {
+          ForEach(this.viewModel.defectCategories, (cat: DefectCategory) => {
+            Row() {
+              Row()
+                .width('16vp')
+                .height('16vp')
+                .borderRadius('4vp')
+                .backgroundColor(cat.color)
+                .margin({ right: '12vp' })
 
-            Column() {
-              Text(cat.name)
-                .fontSize('14fp')
-                .fontColor('#1A2B3C')
-                .fontWeight(FontWeight.Medium)
-              Row() {
-                Text('数量: ' + cat.count.toString())
-                  .fontSize('12fp')
-                  .fontColor('#6B7B8C')
-                Text('  占比: ' + cat.percentage.toString() + '%')
-                  .fontSize('12fp')
-                  .fontColor('#6B7B8C')
+              Column() {
+                Text(cat.name)
+                  .fontSize('14fp')
+                  .fontColor('#1A2B3C')
+                  .fontWeight(FontWeight.Medium)
+                Row() {
+                  Text('数量: ' + cat.count.toString())
+                    .fontSize('12fp')
+                    .fontColor('#6B7B8C')
+                  Text('  占比: ' + cat.percentage.toString() + '%')
+                    .fontSize('12fp')
+                    .fontColor('#6B7B8C')
+                }
+                .width('100%')
+                .margin({ top: '2vp' })
               }
-              .width('100%')
-              .margin({ top: '2vp' })
-            }
-            .layoutWeight(1)
-            .alignItems(HorizontalAlign.Start)
+              .layoutWeight(1)
+              .alignItems(HorizontalAlign.Start)
 
-            Column() {
-              Text(cat.trend === 'up' ? '↑ 上升' : cat.trend === 'down' ? '↓ 下降' : '→ 平稳')
-                .fontSize('11fp')
-                .fontColor(cat.trend === 'up' ? '#F44336' : cat.trend === 'down' ? '#4CAF50' : '#999999')
-                .fontWeight(FontWeight.Medium)
+              Column() {
+                Text(cat.trend === 'up' ? '↑ 上升' : cat.trend === 'down' ? '↓ 下降' : '→ 平稳')
+                  .fontSize('11fp')
+                  .fontColor(cat.trend === 'up' ? '#F44336' : cat.trend === 'down' ? '#4CAF50' : '#999999')
+                  .fontWeight(FontWeight.Medium)
+              }
+              .alignItems(HorizontalAlign.End)
             }
-            .alignItems(HorizontalAlign.End)
-          }
-          .width('100%')
-          .padding('12vp')
-          .borderRadius('10vp')
-          .backgroundColor('#F8F9FB')
-          .margin({ bottom: '10vp' })
-        })
+            .width('100%')
+            .padding('12vp')
+            .borderRadius('10vp')
+            .backgroundColor('#F8F9FB')
+            .margin({ bottom: '10vp' })
+          })
+        }
       }
       .width('100%')
     }
@@ -521,56 +601,60 @@ export struct QualityOverviewView {
         .width('100%')
         .margin({ bottom: '10vp' })
 
-      ForEach(this.viewModel.defectCategories, (cat: DefectCategory, index: number) => {
-        Row() {
-          Text((index + 1).toString())
-            .fontSize('18fp')
-            .fontColor(index < 3 ? '#007DFF' : '#B0BCC8')
-            .fontWeight(FontWeight.Bold)
-            .width('28vp')
-            .textAlign(TextAlign.Center)
-            .margin({ right: '8vp' })
-
-          Column() {
-            Text(cat.name)
-              .fontSize('14fp')
-              .fontColor('#1A2B3C')
-              .fontWeight(FontWeight.Medium)
-            Row() {
-              Row()
-                .width(cat.percentage.toString() + '%')
-                .height('6vp')
-                .borderRadius('3vp')
-                .backgroundColor(cat.color)
-              Blank()
-            }
-            .width('100%')
-            .height('6vp')
-            .borderRadius('3vp')
-            .backgroundColor('#F0F2F5')
-            .margin({ top: '6vp' })
-          }
-          .layoutWeight(1)
-          .alignItems(HorizontalAlign.Start)
-
-          Column() {
-            Text(cat.count.toString())
+      if (this.viewModel.defectCategories.length === 0) {
+        this.buildEmptyHint('暂无缺陷排行')
+      } else {
+        ForEach(this.viewModel.defectCategories, (cat: DefectCategory, index: number) => {
+          Row() {
+            Text((index + 1).toString())
               .fontSize('18fp')
-              .fontColor(cat.color)
+              .fontColor(index < 3 ? '#007DFF' : '#B0BCC8')
               .fontWeight(FontWeight.Bold)
-            Text(cat.percentage.toString() + '%')
-              .fontSize('11fp')
-              .fontColor('#6B7B8C')
+              .width('28vp')
+              .textAlign(TextAlign.Center)
+              .margin({ right: '8vp' })
+
+            Column() {
+              Text(cat.name)
+                .fontSize('14fp')
+                .fontColor('#1A2B3C')
+                .fontWeight(FontWeight.Medium)
+              Row() {
+                Row()
+                  .width(cat.percentage.toString() + '%')
+                  .height('6vp')
+                  .borderRadius('3vp')
+                  .backgroundColor(cat.color)
+                Blank()
+              }
+              .width('100%')
+              .height('6vp')
+              .borderRadius('3vp')
+              .backgroundColor('#F0F2F5')
+              .margin({ top: '6vp' })
+            }
+            .layoutWeight(1)
+            .alignItems(HorizontalAlign.Start)
+
+            Column() {
+              Text(cat.count.toString())
+                .fontSize('18fp')
+                .fontColor(cat.color)
+                .fontWeight(FontWeight.Bold)
+              Text(cat.percentage.toString() + '%')
+                .fontSize('11fp')
+                .fontColor('#6B7B8C')
+            }
+            .alignItems(HorizontalAlign.End)
+            .margin({ left: '12vp' })
           }
-          .alignItems(HorizontalAlign.End)
-          .margin({ left: '12vp' })
-        }
-        .width('100%')
-        .padding('12vp')
-        .borderRadius('10vp')
-        .backgroundColor('#F8F9FB')
-        .margin({ bottom: '8vp' })
-      })
+          .width('100%')
+          .padding('12vp')
+          .borderRadius('10vp')
+          .backgroundColor('#F8F9FB')
+          .margin({ bottom: '8vp' })
+        })
+      }
     }
     .width('100%')
     .padding('14vp')
@@ -590,38 +674,42 @@ export struct QualityOverviewView {
         .width('100%')
         .margin({ bottom: '10vp' })
 
-      ForEach(this.viewModel.lineQualityList, (line: LineQuality) => {
-        Row() {
-          Column() {
-            Text(line.lineName)
-              .fontSize('14fp')
-              .fontColor('#1A2B3C')
-              .fontWeight(FontWeight.Medium)
-            Text('主要缺陷: ' + line.topDefect)
-              .fontSize('11fp')
-              .fontColor('#999999')
-              .margin({ top: '2vp' })
-          }
-          .layoutWeight(1)
-          .alignItems(HorizontalAlign.Start)
+      if (this.viewModel.lineQualityList.length === 0) {
+        this.buildEmptyHint('暂无产线缺陷对比数据')
+      } else {
+        ForEach(this.viewModel.lineQualityList, (line: LineQuality) => {
+          Row() {
+            Column() {
+              Text(line.lineName)
+                .fontSize('14fp')
+                .fontColor('#1A2B3C')
+                .fontWeight(FontWeight.Medium)
+              Text('主要缺陷: ' + line.topDefect)
+                .fontSize('11fp')
+                .fontColor('#999999')
+                .margin({ top: '2vp' })
+            }
+            .layoutWeight(1)
+            .alignItems(HorizontalAlign.Start)
 
-          Column() {
-            Text(line.defectCount.toString())
-              .fontSize('20fp')
-              .fontColor(line.defectCount > 100 ? '#F44336' : '#FF9800')
-              .fontWeight(FontWeight.Bold)
-            Text('缺陷数')
-              .fontSize('10fp')
-              .fontColor('#999999')
+            Column() {
+              Text(line.defectCount.toString())
+                .fontSize('20fp')
+                .fontColor(line.defectCount > 100 ? '#F44336' : '#FF9800')
+                .fontWeight(FontWeight.Bold)
+              Text('缺陷数')
+                .fontSize('10fp')
+                .fontColor('#999999')
+            }
+            .alignItems(HorizontalAlign.End)
           }
-          .alignItems(HorizontalAlign.End)
-        }
-        .width('100%')
-        .padding('12vp')
-        .borderRadius('8vp')
-        .backgroundColor('#F8F9FB')
-        .margin({ bottom: '8vp' })
-      })
+          .width('100%')
+          .padding('12vp')
+          .borderRadius('8vp')
+          .backgroundColor('#F8F9FB')
+          .margin({ bottom: '8vp' })
+        })
+      }
     }
     .width('100%')
     .padding('14vp')
@@ -784,7 +872,7 @@ export struct QualityOverviewView {
 
             Row() {
               Row()
-                .width((point.defectCount * 4).toString() + '%')
+                .width(this.getDefectTrendWidth(point))
                 .height('22vp')
                 .borderRadius('4vp')
                 .backgroundColor(point.defectCount >= 18 ? '#F44336' : point.defectCount >= 15 ? '#FF9800' : '#4CAF50')
@@ -837,7 +925,7 @@ export struct QualityOverviewView {
 
             Row() {
               Row()
-                .width((point.inspectedCount / 5).toString() + '%')
+                .width(this.getInspectionTrendWidth(point))
                 .height('22vp')
                 .borderRadius('4vp')
                 .backgroundColor('#2196F3')
@@ -890,9 +978,9 @@ export struct QualityOverviewView {
             .fontColor('#4CAF50')
             .fontWeight(FontWeight.Bold)
             .margin({ top: '6vp' })
-          Text('↑ 较上月 +0.3%')
+          Text(this.getPassRateChangeText())
             .fontSize('11fp')
-            .fontColor('#4CAF50')
+            .fontColor(this.getPassRateChangeColor())
             .margin({ top: '4vp' })
         }
         .layoutWeight(1)
@@ -910,9 +998,9 @@ export struct QualityOverviewView {
             .fontColor('#F44336')
             .fontWeight(FontWeight.Bold)
             .margin({ top: '6vp' })
-          Text('↓ 较上月 -8')
+          Text(this.getMonthlyDefectChangeText())
             .fontSize('11fp')
-            .fontColor('#4CAF50')
+            .fontColor(this.getMonthlyDefectChangeColor())
             .margin({ top: '4vp' })
         }
         .layoutWeight(1)
@@ -943,7 +1031,7 @@ export struct QualityOverviewView {
       // 报告统计摘要
       Row() {
         Column() {
-          Text((this.viewModel.recentRecords.filter((r: InspectionRecord) => r.result === 'pass').length + ((AppStorage.get('global_pass_count') as number) || 0)).toString())
+          Text(this.viewModel.overview.passRecordCount.toString())
             .fontSize('24fp')
             .fontColor('#4CAF50')
             .fontWeight(FontWeight.Bold)
@@ -961,7 +1049,7 @@ export struct QualityOverviewView {
         .backgroundColor('#E8F5E9')
 
         Column() {
-          Text((this.viewModel.recentRecords.filter((r: InspectionRecord) => r.result === 'conditional').length + ((AppStorage.get('global_cond_count') as number) || 0)).toString())
+          Text(this.viewModel.overview.conditionalRecordCount.toString())
             .fontSize('24fp')
             .fontColor('#FF9800')
             .fontWeight(FontWeight.Bold)
@@ -980,7 +1068,7 @@ export struct QualityOverviewView {
         .margin({ left: '8vp' })
 
         Column() {
-          Text((this.viewModel.recentRecords.filter((r: InspectionRecord) => r.result === 'fail').length + ((AppStorage.get('global_fail_count') as number) || 0)).toString())
+          Text(this.viewModel.overview.failRecordCount.toString())
             .fontSize('24fp')
             .fontColor('#F44336')
             .fontWeight(FontWeight.Bold)
@@ -1019,13 +1107,22 @@ export struct QualityOverviewView {
         .width('100%')
         .padding({ left: this.cardPadding, right: this.cardPadding, top: '8vp', bottom: '8vp' })
 
-      ForEach(this.viewModel.recentRecords, (record: InspectionRecord) => {
-        if (this.reportFilterResult === '' || record.result === this.reportFilterResult) {
-          this.buildReportCard(record)
-        }
-      })
+      if (this.viewModel.recentRecords.length === 0) {
+        this.buildReportEmptyState()
+      } else {
+        ForEach(this.viewModel.recentRecords, (record: InspectionRecord) => {
+          if (this.reportFilterResult === '' || record.result === this.reportFilterResult) {
+            this.buildReportCard(record)
+          }
+        })
+      }
     }
     .width('100%')
+  }
+
+  @Builder
+  buildReportEmptyState() {
+    this.buildEmptyHint('暂无质检记录，待抽检或工单报工后自动汇总')
   }
 
   @Builder
@@ -1139,5 +1236,91 @@ export struct QualityOverviewView {
     .backgroundColor('#FFFFFF')
     .margin({ left: this.cardPadding, right: this.cardPadding, bottom: '10vp' })
     .shadow({ radius: 4, color: '#0F000000', offsetY: 1 })
+  }
+
+  @Builder
+  buildEmptyHint(text: string) {
+    Column() {
+      Text(text)
+        .fontSize('12fp')
+        .fontColor('#8A97A6')
+        .textAlign(TextAlign.Center)
+    }
+    .width('100%')
+    .padding({ top: '18vp', bottom: '18vp', left: '12vp', right: '12vp' })
+    .borderRadius('10vp')
+    .backgroundColor('#F7F9FC')
+  }
+
+  getTodayLabel(): string {
+    const date: Date = new Date();
+    const year: string = date.getFullYear().toString();
+    const month: string = (date.getMonth() + 1).toString().padStart(2, '0');
+    const day: string = date.getDate().toString().padStart(2, '0');
+    return year + '/' + month + '/' + day;
+  }
+
+  getPassRateChangeText(): string {
+    const change: number = this.viewModel.overview.passRateChange;
+    if (change > 0) {
+      return '↑ 较上月 +' + change.toString() + '%';
+    }
+    if (change < 0) {
+      return '↓ 较上月 ' + change.toString() + '%';
+    }
+    return '→ 较上月持平';
+  }
+
+  getPassRateChangeColor(): string {
+    const change: number = this.viewModel.overview.passRateChange;
+    if (change > 0) return '#4CAF50';
+    if (change < 0) return '#F44336';
+    return '#6B7B8C';
+  }
+
+  getMonthlyDefectChangeText(): string {
+    const change: number = this.viewModel.overview.monthlyDefectChange;
+    if (change > 0) {
+      return '↑ 较上月 +' + change.toString();
+    }
+    if (change < 0) {
+      return '↓ 较上月 ' + change.toString();
+    }
+    return '→ 较上月持平';
+  }
+
+  getMonthlyDefectChangeColor(): string {
+    const change: number = this.viewModel.overview.monthlyDefectChange;
+    if (change > 0) return '#F44336';
+    if (change < 0) return '#4CAF50';
+    return '#6B7B8C';
+  }
+
+  getDefectTrendWidth(point: QualityTrendPoint): string {
+    let maxValue: number = 0;
+    for (let i: number = 0; i < this.viewModel.trendData.length; i++) {
+      if (this.viewModel.trendData[i].defectCount > maxValue) {
+        maxValue = this.viewModel.trendData[i].defectCount;
+      }
+    }
+    if (maxValue <= 0) {
+      return '0%';
+    }
+    const width: number = Math.max(12, Math.round(point.defectCount * 100 / maxValue));
+    return width.toString() + '%';
+  }
+
+  getInspectionTrendWidth(point: QualityTrendPoint): string {
+    let maxValue: number = 0;
+    for (let i: number = 0; i < this.viewModel.trendData.length; i++) {
+      if (this.viewModel.trendData[i].inspectedCount > maxValue) {
+        maxValue = this.viewModel.trendData[i].inspectedCount;
+      }
+    }
+    if (maxValue <= 0) {
+      return '0%';
+    }
+    const width: number = Math.max(12, Math.round(point.inspectedCount * 100 / maxValue));
+    return width.toString() + '%';
   }
 }

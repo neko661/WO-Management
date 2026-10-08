@@ -1,8 +1,11 @@
 import { BaseViewModel, HttpApiService, WorkOrder } from 'utils';
+import { SessionManager } from 'datastore';
 
 export interface ProcessTask {
   id: number;
   workOrderId: number;
+  lineId: number;
+  lineName: string;
   workOrderCode: string;
   processCode: string;
   processName: string;
@@ -26,10 +29,14 @@ export class OperatorProcessTaskViewModel extends BaseViewModel {
   @Trace inProgressTask: ProcessTask | null = null;
   @Trace progressPercent: number = 0;
   @Trace elapsedMinutes: number = 0;
+  @Trace selectedTaskId: number = 0;
+  @Trace currentUserName: string = '';
 
   private api: HttpApiService = HttpApiService.getInstance();
+  private session: SessionManager = SessionManager.getInstance();
 
   async init(): Promise<void> {
+    this.currentUserName = await this.session.getUserName();
     await this.loadTasks();
   }
 
@@ -46,6 +53,9 @@ export class OperatorProcessTaskViewModel extends BaseViewModel {
 
         for (let i = 0; i < orders.length; i++) {
           const order = orders[i];
+          if (!this.isVisibleOrder(order)) {
+            continue;
+          }
           const task = this.mapWorkOrderToTask(order);
 
           if (order.status === '待报工' || order.status === '生产完成') {
@@ -63,12 +73,7 @@ export class OperatorProcessTaskViewModel extends BaseViewModel {
           } else if (order.status === '已报工' || order.status === '完工') {
             this.reportedTasks.push(task);
           } else if (order.status === '已派工') {
-            // 已派工的作为待执行任务
-            if (!this.currentTask && !this.inProgressTask) {
-              this.currentTask = task;
-            } else {
-              this.queueTasks.push(task);
-            }
+            this.queueTasks.push(task);
           } else {
             this.queueTasks.push(task);
           }
@@ -80,8 +85,12 @@ export class OperatorProcessTaskViewModel extends BaseViewModel {
         // 如果有进行中的任务，自动切换到进行中 tab
         if (this.inProgressTask) {
           this.currentTab = 1;
+          this.selectedTaskId = this.inProgressTask.id;
         } else if (this.currentTask) {
           this.currentTab = 0;
+          if (this.selectedTaskId === 0) {
+            this.selectedTaskId = this.currentTask.id;
+          }
         } else if (this.reportedTasks.length > 0) {
           this.currentTab = 2;
         }
@@ -96,6 +105,8 @@ export class OperatorProcessTaskViewModel extends BaseViewModel {
     return {
       id: order.id,
       workOrderId: order.id,
+      lineId: order.lineId || 1,
+      lineName: order.lineName || '柔性组装线',
       workOrderCode: order.code,
       processCode: 'OP10', // 模拟工序代码
       processName: order.processName || '标准组装',
@@ -111,11 +122,55 @@ export class OperatorProcessTaskViewModel extends BaseViewModel {
     };
   }
 
+  private isVisibleOrder(order: WorkOrder): boolean {
+    const operatorName: string = order.operatorName || '';
+    if (operatorName.length === 0) {
+      return false;
+    }
+    const visibleStatuses: string[] = ['已派工', '生产中', '暂停中', '生产中暂停', '生产完成', '待报工', '已报工', '完工'];
+    for (let i: number = 0; i < visibleStatuses.length; i++) {
+      if (visibleStatuses[i] === order.status) {
+        return true;
+      }
+    }
+    return operatorName === this.currentUserName;
+  }
+
+  selectTask(taskId: number): void {
+    this.selectedTaskId = taskId;
+    const task: ProcessTask | null = this.findTask(taskId);
+    if (task) {
+      AppStorage.setOrCreate('selected_process_task', JSON.stringify(task));
+    }
+  }
+
+  isTaskSelected(taskId: number): boolean {
+    return this.selectedTaskId === taskId;
+  }
+
+  canEnterLine(): boolean {
+    return this.selectedTaskId > 0;
+  }
+
+  getSelectedLineId(): number {
+    const task: ProcessTask | null = this.findTask(this.selectedTaskId);
+    return task ? task.lineId : 0;
+  }
+
+  getSelectedTaskSummary(): string {
+    const task: ProcessTask | null = this.findTask(this.selectedTaskId);
+    if (!task) {
+      return '请先选择一个待执行任务';
+    }
+    return task.workOrderCode + ' · ' + task.processName + ' · ' + task.lineName;
+  }
+
   switchTab(tabIndex: number): void {
     this.currentTab = tabIndex;
   }
 
   async startTask(taskId: number): Promise<void> {
+    this.selectTask(taskId);
     try {
       const res = await this.api.transitionWorkOrder(taskId, 'start');
       if (res.code === 0) {
@@ -154,5 +209,25 @@ export class OperatorProcessTaskViewModel extends BaseViewModel {
     if (tabIndex === 1) return '进行中';
     if (tabIndex === 2) return '已报工';
     return '';
+  }
+
+  private findTask(taskId: number): ProcessTask | null {
+    if (this.currentTask && this.currentTask.id === taskId) {
+      return this.currentTask;
+    }
+    if (this.inProgressTask && this.inProgressTask.id === taskId) {
+      return this.inProgressTask;
+    }
+    for (let i: number = 0; i < this.queueTasks.length; i++) {
+      if (this.queueTasks[i].id === taskId) {
+        return this.queueTasks[i];
+      }
+    }
+    for (let i: number = 0; i < this.reportedTasks.length; i++) {
+      if (this.reportedTasks[i].id === taskId) {
+        return this.reportedTasks[i];
+      }
+    }
+    return null;
   }
 }

@@ -8,7 +8,7 @@ export class WorkstationDetailViewModel extends BaseViewModel {
   @Trace showToast: boolean = false;
 
   // 当前运行状态: 'running' | 'stopped' | 'reset' | 'fault'
-  @Trace runState: string = 'running';
+  @Trace runState: string = 'idle';
 
   // 确认弹窗
   @Trace showConfirmDialog: boolean = false;
@@ -43,19 +43,19 @@ export class WorkstationDetailViewModel extends BaseViewModel {
       };
     } else if (state === 'stopped') {
       return {
-        deviceStatus: '待机', deviceStatusDesc: '已选择工艺，等待启动',
-        workStatus: '空闲', workAction: '', workActionDesc: '等待操作员启动',
+        deviceStatus: '待机', deviceStatusDesc: '当前工位已暂停，等待恢复',
+        workStatus: '空闲', workAction: '', workActionDesc: '等待恢复启动',
         conveyorStatus: '停止', conveyorDirection: '—', conveyorDesc: '物料传送方向',
         workorderStatus: '暂停中'
       };
     } else if (state === 'reset') {
       return {
-        deviceStatus: '待机', deviceStatusDesc: '设备未启动',
+        deviceStatus: '待机', deviceStatusDesc: '设备已复位',
         workStatus: '空闲', workAction: '', workActionDesc: '等待产线启动',
         conveyorStatus: '停止', conveyorDirection: '—', conveyorDesc: '物料传送方向',
-        workorderStatus: '—'
+        workorderStatus: '已复位'
       };
-    } else {
+    } else if (state === 'fault') {
       return {
         deviceStatus: '故障', deviceStatusDesc: '设备发生故障，等待维修',
         workStatus: '停机', workAction: '', workActionDesc: '等待维修处理',
@@ -63,11 +63,17 @@ export class WorkstationDetailViewModel extends BaseViewModel {
         workorderStatus: '暂停中'
       };
     }
+    return {
+      deviceStatus: '待机', deviceStatusDesc: '等待整线启动',
+      workStatus: '空闲', workAction: '', workActionDesc: '请先在产线页选择任务并启动',
+      conveyorStatus: '停止', conveyorDirection: '—', conveyorDesc: '物料传送方向',
+      workorderStatus: '待启动'
+    };
   }
 
   // 各状态按钮启用情况
   get isStartEnabled(): boolean {
-    return this.runState === 'stopped' || this.runState === 'reset';
+    return this.runState === 'stopped' || this.runState === 'reset' || this.runState === 'idle';
   }
   get isStopEnabled(): boolean {
     return this.runState === 'running';
@@ -99,7 +105,8 @@ export class WorkstationDetailViewModel extends BaseViewModel {
 
     // 读取产线详情页保存的状态
     const savedState: string = AppStorage.get('station_state_' + stationId.toString()) as string;
-    const initState: string = (savedState && savedState.length > 0) ? savedState : 'running';
+    const lineState: string = this.getLineRunState(lineId);
+    const initState: string = (savedState && savedState.length > 0) ? savedState : lineState;
     this.runState = initState;
     const s: StationStateData = this.getStateData(initState, sName);
 
@@ -123,10 +130,10 @@ export class WorkstationDetailViewModel extends BaseViewModel {
       productName: '无线充电器组装',
       operatorName: '刘伟',
       workorderStatus: s.workorderStatus,
-      processedCount: (initState === 'stopped' || initState === 'reset' || initState === 'fault') ? 0 : (150 - idx * 10),
-      rawMaterial: (initState === 'stopped' || initState === 'reset' || initState === 'fault') ? 0 : 81,
-      goodCount: (initState === 'stopped' || initState === 'reset' || initState === 'fault') ? 0 : (148 - idx * 10),
-      ngCount: (initState === 'stopped' || initState === 'reset' || initState === 'fault') ? 0 : 2,
+      processedCount: initState === 'running' ? (150 - idx * 10) : 0,
+      rawMaterial: initState === 'running' ? 81 : 0,
+      goodCount: initState === 'running' ? (148 - idx * 10) : 0,
+      ngCount: initState === 'running' ? 2 : 0,
       processingTime: times[idx],
     };
   }
@@ -163,6 +170,7 @@ export class WorkstationDetailViewModel extends BaseViewModel {
       this.detail.goodCount = 148 - idx * 10;
       this.detail.ngCount = 2;
     }
+    this.syncLineStateToStorage();
   }
 
   // 确认弹窗
@@ -179,7 +187,7 @@ export class WorkstationDetailViewModel extends BaseViewModel {
       this.showToastMsg('设备已启动，正常运行中');
     } else if (this.confirmAction === 'stop') {
       this.applyState('stopped');
-      this.showToastMsg('设备已停止');
+      this.showToastMsg('设备已暂停');
     } else if (this.confirmAction === 'reset') {
       this.applyState('reset');
       this.showToastMsg('设备已复位');
@@ -218,7 +226,7 @@ export class WorkstationDetailViewModel extends BaseViewModel {
         stationCode: this.detail.code,
         stationName: this.detail.name,
         lineName: this.detail.lineName,
-        time: '2026-06-26',
+        time: this.getTodayDate(),
       });
       // 追加到异常列表
       const existing: string = AppStorage.get('operator_exception_tasks') as string;
@@ -255,13 +263,13 @@ export class WorkstationDetailViewModel extends BaseViewModel {
   getStatusColor(status: string): string {
     if (status === '运行' || status === '运行中' || status === '加工中' || status === '正转' || status === '生产中') return '#4CAF50';
     if (status === '故障' || status === '停机') return '#F44336';
-    if (status === '待机' || status === '空闲' || status === '停止' || status === '—') return '#9E9E9E';
+    if (status === '待机' || status === '空闲' || status === '停止' || status === '—' || status === '待启动' || status === '已复位') return '#9E9E9E';
     return '#4CAF50';
   }
 
   getDeviceStatusDotColor(): string {
     if (this.runState === 'running') return '#4CAF50';
-    if (this.runState === 'stopped' || this.runState === 'reset') return '#9E9E9E';
+    if (this.runState === 'stopped' || this.runState === 'reset' || this.runState === 'idle') return '#9E9E9E';
     if (this.runState === 'fault') return '#F44336';
     return '#9E9E9E';
   }
@@ -295,5 +303,66 @@ export class WorkstationDetailViewModel extends BaseViewModel {
     setTimeout(() => {
       this.showToast = false;
     }, 2000);
+  }
+
+  private getLineRunState(lineId: number): string {
+    const state: string = AppStorage.get('line_state_' + lineId.toString()) as string;
+    if (state && state.length > 0) {
+      return state;
+    }
+    return lineId === 1 ? 'running' : 'idle';
+  }
+
+  private syncLineStateToStorage(): void {
+    if (!this.detail) {
+      return;
+    }
+    const lineId: number = this.detail.lineId;
+    let hasFault: boolean = false;
+    let hasRunning: boolean = false;
+    let hasStopped: boolean = false;
+    let hasIdle: boolean = false;
+    let allReset: boolean = true;
+
+    for (let i: number = 1; i <= 7; i++) {
+      const stationState: string = (AppStorage.get('station_state_' + (lineId * 100 + i).toString()) as string) || this.getLineRunState(lineId);
+      if (stationState === 'fault') {
+        hasFault = true;
+      }
+      if (stationState === 'running') {
+        hasRunning = true;
+      }
+      if (stationState === 'stopped') {
+        hasStopped = true;
+      }
+      if (stationState === 'idle') {
+        hasIdle = true;
+      }
+      if (stationState !== 'reset') {
+        allReset = false;
+      }
+    }
+
+    if (hasFault) {
+      AppStorage.setOrCreate('line_state_' + lineId.toString(), 'fault');
+    } else if (hasRunning) {
+      AppStorage.setOrCreate('line_state_' + lineId.toString(), 'running');
+    } else if (allReset) {
+      AppStorage.setOrCreate('line_state_' + lineId.toString(), 'reset');
+    } else if (hasStopped) {
+      AppStorage.setOrCreate('line_state_' + lineId.toString(), 'stopped');
+    } else if (hasIdle) {
+      AppStorage.setOrCreate('line_state_' + lineId.toString(), 'idle');
+    } else {
+      AppStorage.setOrCreate('line_state_' + lineId.toString(), 'idle');
+    }
+  }
+
+  private getTodayDate(): string {
+    const now: Date = new Date();
+    const year: string = now.getFullYear().toString();
+    const month: string = (now.getMonth() + 1).toString().padStart(2, '0');
+    const day: string = now.getDate().toString().padStart(2, '0');
+    return year + '-' + month + '-' + day;
   }
 }

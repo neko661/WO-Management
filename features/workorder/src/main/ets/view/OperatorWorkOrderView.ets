@@ -98,11 +98,11 @@ export struct OperatorWorkOrderView {
       .margin({ right: '14vp' })
 
       Column() {
-        Text('刘伟 · 操作员')
+        Text((this.viewModel.currentUserName || '操作员') + ' · 操作员')
           .fontSize('18fp')
           .fontColor('#0F172A')
           .fontWeight(FontWeight.Bold)
-        Text('显示与你关联的工单：开始生产、报工')
+        Text('显示派工给你的工单，以及其他人名下但你可查看的工单')
           .fontSize('13fp')
           .fontColor('#64748B')
           .margin({ top: '4vp' })
@@ -163,6 +163,23 @@ export struct OperatorWorkOrderView {
         .margin({ top: '8vp' })
 
       Row() {
+        Text('派工给：' + this.viewModel.getOperatorLabel(order))
+          .fontSize('12fp')
+          .fontColor(this.viewModel.canOperateOrder(order) ? '#059669' : '#6B7280')
+        Blank()
+        if (!this.viewModel.canOperateOrder(order)) {
+          Text('只读')
+            .fontSize('11fp')
+            .fontColor('#92400E')
+            .padding({ left: '8vp', right: '8vp', top: '3vp', bottom: '3vp' })
+            .borderRadius('10vp')
+            .backgroundColor('#FEF3C7')
+        }
+      }
+      .width('100%')
+      .margin({ top: '8vp' })
+
+      Row() {
         Text(this.getStatusDescription(order.status))
           .fontSize('18fp')
           .fontColor('#0F172A')
@@ -176,7 +193,18 @@ export struct OperatorWorkOrderView {
       .width('100%')
       .margin({ top: '8vp' })
 
-      if (order.status === '已派工') {
+      if (!this.viewModel.canOperateOrder(order)) {
+        Row() {
+          Text(this.viewModel.getReadonlyHint(order))
+            .fontSize('12fp')
+            .fontColor('#6B7280')
+        }
+        .width('100%')
+        .padding({ left: '12vp', right: '12vp', top: '10vp', bottom: '10vp' })
+        .borderRadius('12vp')
+        .backgroundColor('#F8FAFC')
+        .margin({ top: '14vp' })
+      } else if (order.status === '已派工') {
         Row() {
           Text('→ 去生产')
             .fontSize('16fp')
@@ -218,13 +246,26 @@ export struct OperatorWorkOrderView {
     .width('100%')
     .padding('18vp')
     .borderRadius('20vp')
-    .backgroundColor('#FFFFFF')
-    .border(order.status === '已派工' ? { width: '2vp', color: '#34D399' } : { width: '1vp', color: '#E2E8F0' })
+    .backgroundColor(this.viewModel.canOperateOrder(order) ? '#FFFFFF' : '#F8FAFC')
+    .border(this.getCardBorder(order))
     .margin({ left: this.cardPadding, right: this.cardPadding, bottom: '12vp' })
     .shadow({ radius: 8, color: "rgba(15, 23, 42, 0.04)", offsetY: 2 })
     .onClick(() => {
       this.viewModel.viewDetail(order.id);
     })
+  }
+
+  getCardBorder(order: WorkOrder): BorderOptions {
+    if (!this.viewModel.canOperateOrder(order)) {
+      return { width: '1vp', color: '#CBD5E1' };
+    }
+    if (order.status === '已派工') {
+      return { width: '2vp', color: '#34D399' };
+    }
+    if (order.status === '生产完成') {
+      return { width: '1vp', color: '#7DD3FC' };
+    }
+    return { width: '1vp', color: '#E2E8F0' };
   }
 
   getStatusDescription(status: string): string {
@@ -233,6 +274,7 @@ export struct OperatorWorkOrderView {
     if (status === '已报工') return '已完成报工'
     if (status === '完工') return '已完工'
     if (status === '生产中') return '生产中'
+    if (status === '暂停中' || status === '生产中暂停') return '生产中暂停'
     return status
   }
 

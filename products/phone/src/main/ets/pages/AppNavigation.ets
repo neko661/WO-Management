@@ -15,12 +15,10 @@ struct AppNavigation {
   async aboutToAppear(): Promise<void> {
     await this.session.init(getContext());
     AppStorage.setOrCreate('navPathStack', this.navPathStack);
-    const token: string = await this.session.getToken();
-    if (token) {
-      TokenProvider.setToken(token);
-      this.userRole = await this.session.getRole();
-      this.isLoggedIn = true;
-    }
+    TokenProvider.clearToken();
+    await this.session.clear();
+    this.userRole = '';
+    this.isLoggedIn = false;
   }
 
   build() {

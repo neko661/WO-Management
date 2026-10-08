@@ -1,4 +1,5 @@
 import { BaseViewModel, HttpApiService, WorkOrder, WorkOrderQueryParams } from 'utils';
+import { SessionManager } from 'datastore';
 
 @ObservedV2
 export class OperatorWorkOrderViewModel extends BaseViewModel {
@@ -6,10 +7,13 @@ export class OperatorWorkOrderViewModel extends BaseViewModel {
   @Trace filteredOrders: WorkOrder[] = [];
   @Trace searchKeyword: string = '';
   @Trace filterStatus: string = '';
+  @Trace currentUserName: string = '';
   private api: HttpApiService = HttpApiService.getInstance();
+  private session: SessionManager = SessionManager.getInstance();
   onNavigateToDetail: ((orderId: number) => void) | null = null;
 
   async init(): Promise<void> {
+    this.currentUserName = await this.session.getUserName();
     await this.loadWorkOrders();
   }
 
@@ -32,9 +36,37 @@ export class OperatorWorkOrderViewModel extends BaseViewModel {
       const order: WorkOrder = this.workOrders[i];
       if (this.searchKeyword.length > 0 && !order.code.includes(this.searchKeyword)) continue;
       if (this.filterStatus.length > 0 && order.status !== this.filterStatus) continue;
-      result.push(order);
+      if (this.isOperatorRelevantOrder(order)) {
+        result.push(order);
+      }
     }
     this.filteredOrders = result;
+  }
+
+  private isOperatorRelevantOrder(order: WorkOrder): boolean {
+    const operatorName: string = order.operatorName || '';
+    if (operatorName.length === 0) {
+      return false;
+    }
+    const visibleStatuses: string[] = ['已派工', '生产中', '暂停中', '生产中暂停', '生产完成', '待报工', '已报工', '完工'];
+    for (let i: number = 0; i < visibleStatuses.length; i++) {
+      if (visibleStatuses[i] === order.status) {
+        return true;
+      }
+    }
+    return operatorName === this.currentUserName;
+  }
+
+  canOperateOrder(order: WorkOrder): boolean {
+    return (order.operatorName || '') === this.currentUserName;
+  }
+
+  getOperatorLabel(order: WorkOrder): string {
+    return order.operatorName && order.operatorName.length > 0 ? order.operatorName : '未指派';
+  }
+
+  getReadonlyHint(order: WorkOrder): string {
+    return '当前派工：' + this.getOperatorLabel(order) + '，你可查看但不能操作';
   }
 
   getNextStatus(action: string, currentStatus: string): string {
@@ -90,6 +122,10 @@ export class OperatorWorkOrderViewModel extends BaseViewModel {
   }
 
   async startProduction(orderId: number): Promise<void> {
+    const order: WorkOrder | null = this.findOrder(orderId);
+    if (!order || !this.canOperateOrder(order)) {
+      return;
+    }
     this.applyStatusChange(orderId, 'start');
     try {
       const res = await this.api.transitionWorkOrder(orderId, 'start');
@@ -101,6 +137,10 @@ export class OperatorWorkOrderViewModel extends BaseViewModel {
   }
 
   async reportWork(orderId: number): Promise<void> {
+    const order: WorkOrder | null = this.findOrder(orderId);
+    if (!order || !this.canOperateOrder(order)) {
+      return;
+    }
     this.applyStatusChange(orderId, 'report');
     try {
       const res = await this.api.transitionWorkOrder(orderId, 'report');
@@ -115,5 +155,14 @@ export class OperatorWorkOrderViewModel extends BaseViewModel {
     if (this.onNavigateToDetail) {
       this.onNavigateToDetail(orderId);
     }
+  }
+
+  private findOrder(orderId: number): WorkOrder | null {
+    for (let i: number = 0; i < this.workOrders.length; i++) {
+      if (this.workOrders[i].id === orderId) {
+        return this.workOrders[i];
+      }
+    }
+    return null;
   }
 }
